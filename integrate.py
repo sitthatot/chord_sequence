@@ -1,6 +1,7 @@
 import os
 import mido
 import tkinter as tk
+from tkinter import ttk
 
 def adjust_length(msg, factor):
     """Adjust the length of MIDI messages based on a length factor."""
@@ -29,7 +30,10 @@ def concat_midi_files_single_track(directory, chord_sequence, output_file):
 class ChordApp:
     def __init__(self, master):
         self.master = master
-        self.master.title("Chord Input App")
+        self.master.title("Chord to MIDI by CheezeCakeMusic")
+
+        # Load available chord names from the chords_midi directory
+        self.available_chords = self.load_available_chords()
 
         # File name entry
         self.file_name_label = tk.Label(self.master, text="File name:")
@@ -37,17 +41,17 @@ class ChordApp:
         
         self.file_name_entry = tk.Entry(self.master, width=30)
         self.file_name_entry.pack(pady=5)
-        self.file_name_entry.insert(0, "untitled_name")  # Default file name
+        self.file_name_entry.insert(0, "untitled_name")
 
-        self.entries = []  # List to hold both chord and length entries
-        self.row_count = 0  # To track the number of rows
+        self.entries = []
+        self.row_count = 0
 
         # Frame for chord entries
         self.frame = tk.Frame(self.master)
         self.frame.pack(pady=10)
 
         # Add initial chord entries (4 columns)
-        self.add_chord_row()  # Create the first row
+        self.add_chord_row()
 
         # Button to add more chord rows
         self.add_button = tk.Button(self.master, text="Add Chord Row", command=self.add_chord_row)
@@ -57,28 +61,70 @@ class ChordApp:
         self.concat_button = tk.Button(self.master, text="Generate MIDI", command=self.concatenate_midi)
         self.concat_button.pack(pady=5)
 
+    def load_available_chords(self):
+        """Load available chord names from the chords_midi directory"""
+        chord_dir = 'chords_midi'
+        available_chords = []
+        try:
+            for file in os.listdir(chord_dir):
+                if file.endswith('.mid'):
+                    chord_name = os.path.splitext(file)[0]
+                    available_chords.append(chord_name)
+        except FileNotFoundError:
+            print(f"Warning: '{chord_dir}' directory not found")
+        return sorted(available_chords)
+
+    def create_chord_combobox(self, parent):
+        """Create a Combobox for chord input with autocomplete"""
+        combo = ttk.Combobox(parent, width=12, values=self.available_chords)
+        combo.bind('<KeyRelease>', lambda event, cb=combo: self.update_chord_suggestions(event, cb))
+        return combo
+
+    def update_chord_suggestions(self, event, combo):
+        """Update chord suggestions based on current input"""
+        current_text = combo.get().lower()
+        suggestions = [chord for chord in self.available_chords 
+                      if current_text in chord.lower()]
+        combo['values'] = suggestions
+        
+        # If there's only one suggestion and it matches exactly what's typed
+        # (ignoring case), update the background color
+        if len(suggestions) == 1 and current_text == suggestions[0].lower():
+            combo.state(['!invalid'])
+            # Note: The background color will be handled by the binding to <<ComboboxSelected>>
+        
+        # Keep the dropdown open if there are suggestions
+        if suggestions and len(current_text) > 0:
+            combo.event_generate('<Down>')
+
     def add_chord_row(self):
         """Add a new row of chord entry boxes and length factor entry boxes."""
-        # Create a new frame for the row
         row_frame = tk.Frame(self.frame)
         row_frame.pack(pady=5)
 
-        # Add four pairs of chord and length entries to the new row
         row_entries = []
         for _ in range(4):
-            chord_entry = tk.Entry(row_frame, width=15)
-            chord_entry.pack(side=tk.LEFT, padx=5)
+            # Create Combobox for chord input
+            chord_combo = self.create_chord_combobox(row_frame)
+            chord_combo.pack(side=tk.LEFT, padx=5)
+            
+            # Bind selection event to update background color
+            chord_combo.bind('<<ComboboxSelected>>', 
+                           lambda event, cb=chord_combo: self.check_chord_entry(cb))
+            chord_combo.bind('<FocusOut>', 
+                           lambda event, cb=chord_combo: self.check_chord_entry(cb))
+
+            # Create length entry
             length_entry = tk.Entry(row_frame, width=5)
             length_entry.pack(side=tk.LEFT, padx=5)
-            length_entry.insert(0, "1.0")  # Set default value for length to 1.0
-            length_entry.config(bg="aquamarine2")  # Set default background color to light gray
+            length_entry.insert(0, "1.0")
+            length_entry.config(bg="aquamarine2")
             
-            # Bind the focus out event to the length entry
-            length_entry.bind("<FocusOut>", lambda event, entry=length_entry: self.check_length_entry(entry))
+            length_entry.bind("<FocusOut>", 
+                            lambda event, entry=length_entry: self.check_length_entry(entry))
 
-            row_entries.append((chord_entry, length_entry))
+            row_entries.append((chord_combo, length_entry))
 
-        # Store the entries in the list
         self.entries.append(row_entries)
         self.row_count += 1
 
@@ -86,39 +132,47 @@ class ChordApp:
         """Check the length entry and append '.0' if missing, and color the box."""
         length_value = entry.get()
         if length_value and length_value[-1].isdigit() and '.' not in length_value:
-            entry.insert(tk.END, '.0')  # Append '.0' if it's missing
+            entry.insert(tk.END, '.0')
 
-        # Check if the length is not 1.0
         if length_value != "1.0":
-            entry.config(bg="yellow")  # Change background to yellow
+            entry.config(bg="yellow")
         else:
             entry.config(bg="aquamarine2")
 
+    def check_chord_entry(self, combo):
+        """Check if the chord exists and update the combobox appearance"""
+        chord = combo.get()
+        midi_path = os.path.join('chords_midi', f"{chord}.mid")
+        
+        if os.path.isfile(midi_path):
+            combo.state(['!invalid'])
+            combo.config(style='Valid.TCombobox')
+        else:
+            combo.state(['invalid'])
+            combo.config(style='Invalid.TCombobox')
+
     def concatenate_midi(self):
         """Concatenate the MIDI files based on chord names and length factors."""
-        directory = 'chords_midi'  # Folder containing the MIDI files
-        output_file = self.file_name_entry.get() + '.mid'  # Get the filename from the entry
+        directory = 'chords_midi'
+        output_file = self.file_name_entry.get() + '.mid'
         
         chord_sequence = []
         
-        # Collect all chord and length factor pairs
         for row in self.entries:
-            for chord_entry, length_entry in row:
-                chord = chord_entry.get()
+            for chord_combo, length_entry in row:
+                chord = chord_combo.get()
                 length = length_entry.get()
-                if chord and length:  # Ensure both chord and length are non-empty
-                    # Ensure length is formatted correctly
+                if chord and length:
                     if '.' not in length:
-                        length += '.0'  # Add decimal point if missing
+                        length += '.0'
                     try:
                         chord_sequence.append((chord, float(length)))
                     except ValueError:
                         print(f"Invalid length factor: {length} for chord {chord}")
 
-        print("Chord sequence:", chord_sequence)  # Debugging statement to show collected chord sequence
+        print("Chord sequence:", chord_sequence)
         
-        # Now concatenate the MIDI files
-        if chord_sequence:  # Only proceed if there are chords to process
+        if chord_sequence:
             try:
                 concat_midi_files_single_track(directory, chord_sequence, output_file)
             except Exception as e:
@@ -128,5 +182,11 @@ class ChordApp:
 
 if __name__ == "__main__":
     root = tk.Tk()
+    
+    # Create custom styles for valid/invalid comboboxes
+    style = ttk.Style()
+    style.configure('Valid.TCombobox', fieldbackground='green')
+    style.configure('Invalid.TCombobox', fieldbackground='red')
+    
     app = ChordApp(root)
     root.mainloop()
