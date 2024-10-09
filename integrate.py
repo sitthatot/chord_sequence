@@ -29,7 +29,15 @@ def concat_midi_files_single_track(directory, chord_sequence, output_file):
 class ChordApp:
     def __init__(self, master):
         self.master = master
-        self.master.title("Chord to MIDI by CheezeCakeMusic")
+        self.master.title("Chord Input App")
+
+        # File name entry
+        self.file_name_label = tk.Label(self.master, text="File name:")
+        self.file_name_label.pack(pady=5)
+        
+        self.file_name_entry = tk.Entry(self.master, width=30)
+        self.file_name_entry.pack(pady=5)
+        self.file_name_entry.insert(0, "untitled_name")  # Default file name
 
         self.entries = []  # List to hold both chord and length entries
         self.row_count = 0  # To track the number of rows
@@ -44,10 +52,6 @@ class ChordApp:
         # Button to add more chord rows
         self.add_button = tk.Button(self.master, text="Add Chord Row", command=self.add_chord_row)
         self.add_button.pack(pady=5)
-
-        # Run button to save chords and print to terminal
-        # self.run_button = tk.Button(self.master, text="Run", command=self.run)
-        # self.run_button.pack(pady=5)
 
         # Concatenate MIDI button
         self.concat_button = tk.Button(self.master, text="Generate MIDI", command=self.concatenate_midi)
@@ -67,6 +71,7 @@ class ChordApp:
             length_entry = tk.Entry(row_frame, width=5)
             length_entry.pack(side=tk.LEFT, padx=5)
             length_entry.insert(0, "1.0")  # Set default value for length to 1.0
+            length_entry.config(bg="aquamarine2")  # Set default background color to light gray
             
             # Bind the focus out event to the length entry
             length_entry.bind("<FocusOut>", lambda event, entry=length_entry: self.check_length_entry(entry))
@@ -87,24 +92,12 @@ class ChordApp:
         if length_value != "1.0":
             entry.config(bg="yellow")  # Change background to yellow
         else:
-            entry.config(bg="white")  # Reset to default color
-
-    # def run(self):
-    #     """Collect chord names and length factors, and print them."""
-    #     chords_and_lengths = []
-    #     for row in self.entries:
-    #         for chord_entry, length_entry in row:
-    #             chord = chord_entry.get()
-    #             length = length_entry.get()
-    #             if chord and length:  # Only add non-empty pairs
-    #                 chords_and_lengths.append((chord, length))
-
-    #     print("Chords and Lengths:", chords_and_lengths)  # Print chords and lengths to the terminal
+            entry.config(bg="aquamarine2")
 
     def concatenate_midi(self):
         """Concatenate the MIDI files based on chord names and length factors."""
         directory = 'chords_midi'  # Folder containing the MIDI files
-        output_file = 'combined_output_single_track.mid'  # Output MIDI filename
+        output_file = self.file_name_entry.get() + '.mid'  # Get the filename from the entry
         
         chord_sequence = []
         
