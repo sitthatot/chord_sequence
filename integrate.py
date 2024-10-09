@@ -103,7 +103,7 @@ class ChordApp:
         row_entries = []
         for _ in range(4):
             # Create Label for indicator
-            indicator_label = tk.Label(row_frame, width=2, bg="white")
+            indicator_label = tk.Label(row_frame, width=2, bg="gray")  # Start with gray
             indicator_label.pack(side=tk.LEFT, padx=(0, 5))
 
             # Create Combobox for chord input
@@ -112,9 +112,9 @@ class ChordApp:
             
             # Bind selection event to update background color
             chord_combo.bind('<<ComboboxSelected>>', 
-                             lambda event, cb=chord_combo, ind_label=indicator_label: self.check_chord_entry(cb, ind_label))
+                            lambda event, cb=chord_combo, ind_label=indicator_label: self.check_chord_entry(cb, ind_label))
             chord_combo.bind('<FocusOut>', 
-                             lambda event, cb=chord_combo, ind_label=indicator_label: self.check_chord_entry(cb, ind_label))
+                            lambda event, cb=chord_combo, ind_label=indicator_label: self.check_chord_entry(cb, ind_label))
 
             # Create length entry
             length_entry = tk.Entry(row_frame, width=5)
@@ -123,12 +123,13 @@ class ChordApp:
             length_entry.config(bg="aquamarine2")
             
             length_entry.bind("<FocusOut>", 
-                              lambda event, entry=length_entry: self.check_length_entry(entry))
+                            lambda event, entry=length_entry: self.check_length_entry(entry))
 
             row_entries.append((chord_combo, length_entry, indicator_label))
 
         self.entries.append(row_entries)
         self.row_count += 1
+
 
     def check_length_entry(self, entry):
         """Check the length entry and append '.0' if missing, and color the box."""
@@ -143,10 +144,13 @@ class ChordApp:
 
     def check_chord_entry(self, combo, indicator_label):
         """Check if the chord exists and update the combobox appearance."""
-        chord = combo.get()
+        chord = combo.get().strip()  # Get the chord and remove any leading/trailing spaces
         midi_path = os.path.join('chords_midi', f"{chord}.mid")
         
-        if os.path.isfile(midi_path):
+        if not chord:  # If the input is empty
+            indicator_label.config(bg="gray")  # Set indicator to gray
+            combo.state(['!invalid'])  # Allow empty input
+        elif os.path.isfile(midi_path):
             combo.state(['!invalid'])
             combo.config(style='Valid.TCombobox')
             indicator_label.config(bg="green")  # Set indicator to green
@@ -194,4 +198,5 @@ if __name__ == "__main__":
     
     app = ChordApp(root)
     root.mainloop()
+
 
