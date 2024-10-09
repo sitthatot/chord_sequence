@@ -81,21 +81,19 @@ class ChordApp:
         return combo
 
     def update_chord_suggestions(self, event, combo):
-        """Update chord suggestions based on current input"""
+        """Update chord suggestions based on current input."""
         current_text = combo.get().lower()
         suggestions = [chord for chord in self.available_chords 
-                      if current_text in chord.lower()]
+                       if current_text in chord.lower()]
         combo['values'] = suggestions
-        
+
         # If there's only one suggestion and it matches exactly what's typed
         # (ignoring case), update the background color
         if len(suggestions) == 1 and current_text == suggestions[0].lower():
             combo.state(['!invalid'])
-            # Note: The background color will be handled by the binding to <<ComboboxSelected>>
-        
-        # Keep the dropdown open if there are suggestions
-        if suggestions and len(current_text) > 0:
-            combo.event_generate('<Down>')
+            # Open the dropdown only if the suggestion is a valid match
+            if current_text == suggestions[0].lower():
+                combo.event_generate('<Down>')
 
     def add_chord_row(self):
         """Add a new row of chord entry boxes and length factor entry boxes."""
@@ -104,15 +102,19 @@ class ChordApp:
 
         row_entries = []
         for _ in range(4):
+            # Create Label for indicator
+            indicator_label = tk.Label(row_frame, width=2, bg="white")
+            indicator_label.pack(side=tk.LEFT, padx=(0, 5))
+
             # Create Combobox for chord input
             chord_combo = self.create_chord_combobox(row_frame)
             chord_combo.pack(side=tk.LEFT, padx=5)
             
             # Bind selection event to update background color
             chord_combo.bind('<<ComboboxSelected>>', 
-                           lambda event, cb=chord_combo: self.check_chord_entry(cb))
+                             lambda event, cb=chord_combo, ind_label=indicator_label: self.check_chord_entry(cb, ind_label))
             chord_combo.bind('<FocusOut>', 
-                           lambda event, cb=chord_combo: self.check_chord_entry(cb))
+                             lambda event, cb=chord_combo, ind_label=indicator_label: self.check_chord_entry(cb, ind_label))
 
             # Create length entry
             length_entry = tk.Entry(row_frame, width=5)
@@ -121,9 +123,9 @@ class ChordApp:
             length_entry.config(bg="aquamarine2")
             
             length_entry.bind("<FocusOut>", 
-                            lambda event, entry=length_entry: self.check_length_entry(entry))
+                              lambda event, entry=length_entry: self.check_length_entry(entry))
 
-            row_entries.append((chord_combo, length_entry))
+            row_entries.append((chord_combo, length_entry, indicator_label))
 
         self.entries.append(row_entries)
         self.row_count += 1
@@ -139,17 +141,19 @@ class ChordApp:
         else:
             entry.config(bg="aquamarine2")
 
-    def check_chord_entry(self, combo):
-        """Check if the chord exists and update the combobox appearance"""
+    def check_chord_entry(self, combo, indicator_label):
+        """Check if the chord exists and update the combobox appearance."""
         chord = combo.get()
         midi_path = os.path.join('chords_midi', f"{chord}.mid")
         
         if os.path.isfile(midi_path):
             combo.state(['!invalid'])
             combo.config(style='Valid.TCombobox')
+            indicator_label.config(bg="green")  # Set indicator to green
         else:
             combo.state(['invalid'])
             combo.config(style='Invalid.TCombobox')
+            indicator_label.config(bg="red")  # Set indicator to red
 
     def concatenate_midi(self):
         """Concatenate the MIDI files based on chord names and length factors."""
@@ -159,7 +163,7 @@ class ChordApp:
         chord_sequence = []
         
         for row in self.entries:
-            for chord_combo, length_entry in row:
+            for chord_combo, length_entry, _ in row:
                 chord = chord_combo.get()
                 length = length_entry.get()
                 if chord and length:
@@ -190,3 +194,4 @@ if __name__ == "__main__":
     
     app = ChordApp(root)
     root.mainloop()
+
