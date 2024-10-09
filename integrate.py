@@ -8,18 +8,19 @@ def adjust_length(msg, factor):
         msg.time = int(msg.time * factor)
     return msg
 
-def concat_midi_files_single_track(directory, length_factors, output_file):
+def concat_midi_files_single_track(directory, chord_sequence, output_file):
     combined_midi = mido.MidiFile()
     combined_track = mido.MidiTrack()
     
-    for midi_file in length_factors.keys():
-        midi_path = os.path.join(directory, midi_file)
-        midi = mido.MidiFile(midi_path)
-        length_factor = length_factors[midi_file]
-        
-        for track in midi.tracks:
-            for msg in track:
-                combined_track.append(adjust_length(msg.copy(), length_factor))
+    for chord, length_factor in chord_sequence:
+        midi_path = os.path.join(directory, f"{chord}.mid")
+        try:
+            midi = mido.MidiFile(midi_path)
+            for track in midi.tracks:
+                for msg in track:
+                    combined_track.append(adjust_length(msg.copy(), length_factor))
+        except FileNotFoundError:
+            print(f"Warning: MIDI file for chord '{chord}' not found. Skipping.")
     
     combined_midi.tracks.append(combined_track)
     combined_midi.save(output_file)
@@ -30,7 +31,7 @@ class ChordApp:
         self.master = master
         self.master.title("Chord Input App")
 
-        self.chord_entries = []  # List to hold chord entries
+        self.entries = []  # List to hold both chord and length entries
         self.row_count = 0  # To track the number of rows
 
         # Frame for chord entries
@@ -48,59 +49,69 @@ class ChordApp:
         self.run_button = tk.Button(self.master, text="Run", command=self.run)
         self.run_button.pack(pady=5)
 
-        # Button to concatenate MIDI files
+        # Concatenate MIDI button
         self.concat_button = tk.Button(self.master, text="Concatenate MIDI", command=self.concatenate_midi)
         self.concat_button.pack(pady=5)
 
     def add_chord_row(self):
-        """Add a new row of chord entry boxes."""
+        """Add a new row of chord entry boxes and length factor entry boxes."""
         # Create a new frame for the row
         row_frame = tk.Frame(self.frame)
         row_frame.pack(pady=5)
 
-        # Add four chord entries to the new row
+        # Add four pairs of chord and length entries to the new row
         row_entries = []
         for _ in range(4):
             chord_entry = tk.Entry(row_frame, width=15)
             chord_entry.pack(side=tk.LEFT, padx=5)
-            row_entries.append(chord_entry)
+            length_entry = tk.Entry(row_frame, width=5)
+            length_entry.pack(side=tk.LEFT, padx=5)
+            row_entries.append((chord_entry, length_entry))
 
         # Store the entries in the list
-        self.chord_entries.append(row_entries)
+        self.entries.append(row_entries)
         self.row_count += 1
 
     def run(self):
-        """Collect chord names and print them."""
-        chords = []
-        for row in self.chord_entries:
-            row_chords = [entry.get() for entry in row if entry.get()]  # Get non-empty entries from each row
-            if row_chords:  # Only add non-empty rows
-                chords.append(row_chords)
+        """Collect chord names and length factors, and print them."""
+        chords_and_lengths = []
+        for row in self.entries:
+            for chord_entry, length_entry in row:
+                chord = chord_entry.get()
+                length = length_entry.get()
+                if chord and length:  # Only add non-empty pairs
+                    chords_and_lengths.append((chord, length))
 
-        print("Chords:", chords)  # Print chords to the terminal
+        print("Chords and Lengths:", chords_and_lengths)  # Print chords and lengths to the terminal
 
     def concatenate_midi(self):
-        """Concatenate MIDI files based on user input and predefined length factors."""
-        # Specify the directory containing MIDI files
-        directory = 'chords_midi'  # Your MIDI files should be in this folder
+        """Concatenate the MIDI files based on chord names and length factors."""
+        directory = 'chords_midi'  # Folder containing the MIDI files
+        output_file = 'combined_output_single_track.mid'  # Output MIDI filename
         
-        # Define length factors for each MIDI file based on entries
-        length_factors = {}
-        for row in self.chord_entries:
-            for entry in row:
-                chord_name = entry.get()
-                if chord_name:  # Only add non-empty entries
-                    length_factors[chord_name + '.mid'] = 1  # Default factor is 1 (no change)
+        chord_sequence = []
+        
+        # Collect all chord and length factor pairs
+        for row in self.entries:
+            for chord_entry, length_entry in row:
+                chord = chord_entry.get()
+                length = length_entry.get()
+                if chord and length:  # Ensure both chord and length are non-empty
+                    try:
+                        chord_sequence.append((chord, float(length)))
+                    except ValueError:
+                        print(f"Invalid length factor: {length} for chord {chord}")
 
-        # You can customize the length factors here based on user input
-        # Example: length_factors['A#7sus4.mid'] = 0.5
+        print("Chord sequence:", chord_sequence)  # Debugging statement to show collected chord sequence
         
-        # Define the output filename
-        output_file = 'combined_output_single_track.mid'
-        
-        # Concatenate the MIDI files into a single track
-        concat_midi_files_single_track(directory, length_factors, output_file)
-
+        # Now concatenate the MIDI files
+        if chord_sequence:  # Only proceed if there are chords to process
+            try:
+                concat_midi_files_single_track(directory, chord_sequence, output_file)
+            except Exception as e:
+                print(f"Error during MIDI concatenation: {e}")
+        else:
+            print("No valid chord sequence found. MIDI concatenation aborted.")
 
 if __name__ == "__main__":
     root = tk.Tk()
