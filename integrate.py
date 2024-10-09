@@ -29,7 +29,7 @@ def concat_midi_files_single_track(directory, chord_sequence, output_file):
 class ChordApp:
     def __init__(self, master):
         self.master = master
-        self.master.title("Chord Input App")
+        self.master.title("Chord to MIDI by CheezeCakeMusic")
 
         self.entries = []  # List to hold both chord and length entries
         self.row_count = 0  # To track the number of rows
@@ -46,11 +46,11 @@ class ChordApp:
         self.add_button.pack(pady=5)
 
         # Run button to save chords and print to terminal
-        self.run_button = tk.Button(self.master, text="Run", command=self.run)
-        self.run_button.pack(pady=5)
+        # self.run_button = tk.Button(self.master, text="Run", command=self.run)
+        # self.run_button.pack(pady=5)
 
         # Concatenate MIDI button
-        self.concat_button = tk.Button(self.master, text="Concatenate MIDI", command=self.concatenate_midi)
+        self.concat_button = tk.Button(self.master, text="Generate MIDI", command=self.concatenate_midi)
         self.concat_button.pack(pady=5)
 
     def add_chord_row(self):
@@ -66,23 +66,40 @@ class ChordApp:
             chord_entry.pack(side=tk.LEFT, padx=5)
             length_entry = tk.Entry(row_frame, width=5)
             length_entry.pack(side=tk.LEFT, padx=5)
+            length_entry.insert(0, "1.0")  # Set default value for length to 1.0
+            
+            # Bind the focus out event to the length entry
+            length_entry.bind("<FocusOut>", lambda event, entry=length_entry: self.check_length_entry(entry))
+
             row_entries.append((chord_entry, length_entry))
 
         # Store the entries in the list
         self.entries.append(row_entries)
         self.row_count += 1
 
-    def run(self):
-        """Collect chord names and length factors, and print them."""
-        chords_and_lengths = []
-        for row in self.entries:
-            for chord_entry, length_entry in row:
-                chord = chord_entry.get()
-                length = length_entry.get()
-                if chord and length:  # Only add non-empty pairs
-                    chords_and_lengths.append((chord, length))
+    def check_length_entry(self, entry):
+        """Check the length entry and append '.0' if missing, and color the box."""
+        length_value = entry.get()
+        if length_value and length_value[-1].isdigit() and '.' not in length_value:
+            entry.insert(tk.END, '.0')  # Append '.0' if it's missing
 
-        print("Chords and Lengths:", chords_and_lengths)  # Print chords and lengths to the terminal
+        # Check if the length is not 1.0
+        if length_value != "1.0":
+            entry.config(bg="yellow")  # Change background to yellow
+        else:
+            entry.config(bg="white")  # Reset to default color
+
+    # def run(self):
+    #     """Collect chord names and length factors, and print them."""
+    #     chords_and_lengths = []
+    #     for row in self.entries:
+    #         for chord_entry, length_entry in row:
+    #             chord = chord_entry.get()
+    #             length = length_entry.get()
+    #             if chord and length:  # Only add non-empty pairs
+    #                 chords_and_lengths.append((chord, length))
+
+    #     print("Chords and Lengths:", chords_and_lengths)  # Print chords and lengths to the terminal
 
     def concatenate_midi(self):
         """Concatenate the MIDI files based on chord names and length factors."""
@@ -97,6 +114,9 @@ class ChordApp:
                 chord = chord_entry.get()
                 length = length_entry.get()
                 if chord and length:  # Ensure both chord and length are non-empty
+                    # Ensure length is formatted correctly
+                    if '.' not in length:
+                        length += '.0'  # Add decimal point if missing
                     try:
                         chord_sequence.append((chord, float(length)))
                     except ValueError:
